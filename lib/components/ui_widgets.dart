@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import 'package:flutter/rendering.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:obtainium/theme.dart';
@@ -1246,6 +1248,323 @@ class _TvColourSwatch extends StatelessWidget {
                       : null)
                 : Center(child: icon),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+enum SearchAppBarLayoutBehavior { preferCentered, preferFlexible }
+
+class SearchAppBarRowLayout extends StatelessWidget {
+  const SearchAppBarRowLayout({
+    super.key,
+    this.behavior = SearchAppBarLayoutBehavior.preferCentered,
+    this.minimumCenteredWidth = 312.0,
+    this.centeredWidthFraction = 0.5,
+    this.textDirection,
+    this.leading,
+    required this.searchBar,
+    this.trailing,
+  });
+
+  final SearchAppBarLayoutBehavior behavior;
+  final double minimumCenteredWidth;
+  final double centeredWidthFraction;
+  final TextDirection? textDirection;
+  final Widget? leading;
+  final Widget searchBar;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) => _SearchAppBarRowLayout(
+    behavior: behavior,
+    minimumCenteredWidth: minimumCenteredWidth,
+    centeredWidthFraction: centeredWidthFraction,
+    textDirection: textDirection,
+    leading: leading,
+    searchBar: searchBar,
+    trailing: trailing,
+  );
+}
+
+enum _SearchAppBarRowLayoutSlot { leading, searchBar, trailing }
+
+class _SearchAppBarRowLayout
+    extends
+        SlottedMultiChildRenderObjectWidget<
+          _SearchAppBarRowLayoutSlot,
+          RenderBox
+        > {
+  const _SearchAppBarRowLayout({
+    required this.behavior,
+    required this.minimumCenteredWidth,
+    required this.centeredWidthFraction,
+    this.textDirection,
+    this.leading,
+    required this.searchBar,
+    this.trailing,
+  });
+
+  final SearchAppBarLayoutBehavior behavior;
+  final double minimumCenteredWidth;
+  final double centeredWidthFraction;
+  final TextDirection? textDirection;
+  final Widget? leading;
+  final Widget searchBar;
+  final Widget? trailing;
+
+  @override
+  Iterable<_SearchAppBarRowLayoutSlot> get slots =>
+      _SearchAppBarRowLayoutSlot.values;
+
+  @override
+  Widget? childForSlot(_SearchAppBarRowLayoutSlot slot) => switch (slot) {
+    _SearchAppBarRowLayoutSlot.leading => leading,
+    _SearchAppBarRowLayoutSlot.searchBar => searchBar,
+    _SearchAppBarRowLayoutSlot.trailing => trailing,
+  };
+
+  @override
+  _RenderSearchAppBarRowLayout createRenderObject(BuildContext context) =>
+      _RenderSearchAppBarRowLayout(
+        behavior: behavior,
+        minimumCenteredWidth: minimumCenteredWidth,
+        centeredWidthFraction: centeredWidthFraction,
+        textDirection: textDirection ?? Directionality.maybeOf(context),
+      );
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderSearchAppBarRowLayout renderObject,
+  ) {
+    renderObject
+      ..behavior = behavior
+      ..minimumCenteredWidth = minimumCenteredWidth
+      ..centeredWidthFraction = centeredWidthFraction
+      ..textDirection = textDirection ?? Directionality.maybeOf(context);
+  }
+}
+
+class _RenderSearchAppBarRowLayout extends RenderBox
+    with
+        SlottedContainerRenderObjectMixin<
+          _SearchAppBarRowLayoutSlot,
+          RenderBox
+        > {
+  _RenderSearchAppBarRowLayout({
+    required this._behavior,
+    required this._minimumCenteredWidth,
+    required this._centeredWidthFraction,
+    this._textDirection,
+  });
+
+  SearchAppBarLayoutBehavior _behavior;
+  SearchAppBarLayoutBehavior get behavior => _behavior;
+  set behavior(SearchAppBarLayoutBehavior value) {
+    if (_behavior == value) return;
+    _behavior = value;
+    markNeedsLayout();
+  }
+
+  double _minimumCenteredWidth;
+  double get minimumCenteredWidth => _minimumCenteredWidth;
+  set minimumCenteredWidth(double value) {
+    if (_minimumCenteredWidth == value) return;
+    _minimumCenteredWidth = value;
+    markNeedsLayout();
+  }
+
+  double _centeredWidthFraction;
+  double get centeredWidthFraction => _centeredWidthFraction;
+  set centeredWidthFraction(double value) {
+    if (_centeredWidthFraction == value) return;
+    _centeredWidthFraction = value;
+    markNeedsLayout();
+  }
+
+  TextDirection? _textDirection;
+  TextDirection? get textDirection => _textDirection;
+  set textDirection(TextDirection? value) {
+    if (_textDirection == value) return;
+    _textDirection = value;
+    markNeedsLayout();
+  }
+
+  @override
+  void performLayout() {
+    final minimumCenteredWidth = this.minimumCenteredWidth;
+    final centeredWidthFraction = this.centeredWidthFraction;
+    final textDirection = this.textDirection ?? .ltr;
+    final leading = childForSlot(_SearchAppBarRowLayoutSlot.leading);
+    final searchBar = childForSlot(_SearchAppBarRowLayoutSlot.searchBar);
+    final trailing = childForSlot(_SearchAppBarRowLayoutSlot.trailing);
+
+    assert(constraints.hasTightWidth);
+    final width = constraints.maxWidth;
+    final minHeight = constraints.minHeight;
+    final maxHeight = constraints.maxHeight;
+    var height = minHeight;
+
+    final Size leadingSize;
+    if (leading != null) {
+      final leadingConstraints = BoxConstraints(
+        maxWidth: width,
+        maxHeight: maxHeight,
+      );
+      leadingSize = ChildLayoutHelper.layoutChild(leading, leadingConstraints);
+      if (leadingSize.height > height) height = leadingSize.height;
+    } else {
+      leadingSize = Size.zero;
+    }
+
+    final Size trailingSize;
+    if (trailing != null) {
+      final trailingConstraints = BoxConstraints(
+        maxWidth: width - leadingSize.width,
+        maxHeight: maxHeight,
+      );
+      trailingSize = ChildLayoutHelper.layoutChild(
+        trailing,
+        trailingConstraints,
+      );
+      if (trailingSize.height > height) height = trailingSize.height;
+    } else {
+      trailingSize = Size.zero;
+    }
+
+    final Size searchBarSize;
+    late final bool isSearchBarCentered;
+    if (searchBar != null) {
+      final flexibleSpaceWidth = width - leadingSize.width - trailingSize.width;
+      final centeredSpaceWidth =
+          width - 2.0 * math.max(leadingSize.width, trailingSize.width);
+      isSearchBarCentered = centeredSpaceWidth > minimumCenteredWidth;
+      final searchBarWidth = isSearchBarCentered
+          ? math.max(
+              minimumCenteredWidth,
+              centeredSpaceWidth * centeredWidthFraction,
+            )
+          : math.min(minimumCenteredWidth, flexibleSpaceWidth);
+
+      final searchBarConstraints = BoxConstraints(
+        minWidth: searchBarWidth,
+        maxWidth: searchBarWidth,
+        maxHeight: maxHeight,
+      );
+      searchBarSize = ChildLayoutHelper.layoutChild(
+        searchBar,
+        searchBarConstraints,
+      );
+      if (searchBarSize.height > height) height = searchBarSize.height;
+    } else {
+      searchBarSize = Size.zero;
+    }
+
+    // Accumulate total height and center children vertically.
+    if (leading != null) {
+      (leading.parentData! as BoxParentData).offset = Offset(
+        switch (textDirection) {
+          TextDirection.ltr => 0.0,
+          TextDirection.rtl => width - leadingSize.width,
+        },
+        (height - leadingSize.height) / 2.0,
+      );
+    }
+    if (trailing != null) {
+      (trailing.parentData! as BoxParentData).offset = Offset(
+        switch (textDirection) {
+          TextDirection.ltr => width - trailingSize.width,
+          TextDirection.rtl => 0.0,
+        },
+        (height - trailingSize.height) / 2.0,
+      );
+    }
+    if (searchBar != null) {
+      (searchBar.parentData! as BoxParentData).offset = Offset(
+        switch (textDirection) {
+          TextDirection.ltr =>
+            isSearchBarCentered
+                ? (width - searchBarSize.width) / 2.0
+                : leadingSize.width >= trailingSize.width
+                ? leadingSize.width
+                : width - trailingSize.width - searchBarSize.width,
+          TextDirection.rtl =>
+            isSearchBarCentered
+                ? (width - searchBarSize.width) / 2.0
+                : trailingSize.width >= leadingSize.width
+                ? trailingSize.width
+                : width - leadingSize.width - searchBarSize.width,
+        },
+        (height - searchBarSize.height) / 2.0,
+      );
+    }
+    size = Size(width, height);
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    void paintChild(PaintingContext context, RenderBox? child) {
+      if (child != null) {
+        final childParentData = child.parentData! as BoxParentData;
+        context.paintChild(child, childParentData.offset + offset);
+      }
+    }
+
+    paintChild(context, childForSlot(_SearchAppBarRowLayoutSlot.searchBar));
+    paintChild(context, childForSlot(_SearchAppBarRowLayoutSlot.trailing));
+    paintChild(context, childForSlot(_SearchAppBarRowLayoutSlot.leading));
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    bool hitTestChild(RenderBox? child) {
+      if (child == null) return false;
+      final childParentData = child.parentData! as BoxParentData;
+      return result.addWithPaintOffset(
+        offset: childParentData.offset,
+        position: position,
+        hitTest: (result, transformed) {
+          assert(transformed == position - childParentData.offset);
+          return child.hitTest(result, position: transformed);
+        },
+      );
+    }
+
+    return hitTestChild(childForSlot(_SearchAppBarRowLayoutSlot.leading)) ||
+        hitTestChild(childForSlot(_SearchAppBarRowLayoutSlot.trailing)) ||
+        hitTestChild(childForSlot(_SearchAppBarRowLayoutSlot.searchBar));
+  }
+}
+
+class SearchAppBar extends StatelessWidget {
+  const SearchAppBar({
+    super.key,
+    this.leading,
+    required this.searchBar,
+    this.trailing,
+    this.bottom,
+  });
+
+  final Widget? leading;
+  final Widget searchBar;
+  final Widget? trailing;
+  final PreferredSizeWidget? bottom;
+
+  @override
+  Widget build(BuildContext context) {
+    final topPadding = MediaQuery.paddingOf(context).top;
+    return SliverAppBar(
+      primary: true,
+      toolbarHeight: 64,
+      bottom: bottom,
+      flexibleSpace: Padding(
+        padding: EdgeInsets.fromLTRB(0.0, topPadding, 0.0, 0.0),
+        child: SearchAppBarRowLayout(
+          leading: leading,
+          searchBar: searchBar,
+          trailing: trailing,
         ),
       ),
     );
