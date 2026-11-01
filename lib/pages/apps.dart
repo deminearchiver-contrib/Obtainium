@@ -982,14 +982,40 @@ class AppsPageState extends State<AppsPage> {
       label: '${selecting ? tr('selectAll') : tr('deselectAll')} ($count)',
       excludeSemantics: true,
       onTap: toggle,
-      child: TextButton.icon(
-        style: const ButtonStyle(visualDensity: VisualDensity.compact),
-        onPressed: toggle,
-        icon: Icon(
-          selecting ? Icons.select_all_outlined : Icons.deselect_outlined,
-          color: Theme.of(context).colorScheme.primary,
+      child: IconButton(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(Size(48, 32)),
+          maximumSize: const WidgetStatePropertyAll(Size.infinite),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          ),
+          backgroundColor: WidgetStatePropertyAll(
+            Theme.of(context).colorScheme.surfaceContainerHigh,
+          ),
+          foregroundColor: WidgetStatePropertyAll(
+            Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
-        label: Text(count.toString()),
+        onPressed: toggle,
+        icon: Row(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 4,
+          children: [
+            Icon(
+              selecting ? Icons.select_all_outlined : Icons.deselect_outlined,
+              size: 20,
+              opticalSize: 20,
+            ),
+            Flexible(
+              child: Text(
+                count.toString(),
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1047,42 +1073,134 @@ class AppsPageState extends State<AppsPage> {
     List<AppInMemory> listedApps,
   ) {
     final isFilterOff = filter.isIdenticalTo(neutralFilter, settingsProvider);
-    final trailing = <Widget>[
-      _getSelectAllButton(context, listedApps),
-      if (!isFilterOff)
+
+    if (settingsProvider.isTV) {
+      final trailing = <Widget>[
+        if (settingsProvider.isTV) _getSelectAllButton(context, listedApps),
+        if (!isFilterOff)
+          IconButton(
+            tooltip: '${tr('filter')} - ${tr('remove')}',
+            onPressed: () => clearSearchAndFilter(),
+            icon: const Icon(Icons.filter_alt_off_outlined),
+          ),
         IconButton(
-          tooltip: '${tr('filter')} - ${tr('remove')}',
-          onPressed: () => clearSearchAndFilter(),
-          icon: const Icon(Icons.filter_alt_off_outlined),
+          tooltip: tr('filterApps'),
+          onPressed: () => showFilterDialog(context),
+          icon: const Icon(Icons.filter_list_rounded),
         ),
-      IconButton(
-        tooltip: tr('filterApps'),
-        onPressed: () => showFilterDialog(context),
-        icon: const Icon(Icons.filter_list_rounded),
-      ),
-    ];
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: settingsProvider.isTV
-            ? _TVSearchBar(
-                controller: searchController,
-                onChanged: onSearchChanged,
-                trailing: trailing,
-                hintText: tr('search'),
-              )
-            : SearchBar(
-                controller: searchController,
-                hintText: tr('search'),
-                padding: const WidgetStatePropertyAll(
-                  AppPaddings.pageHorizontal,
+      ];
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: _TVSearchBar(
+            controller: searchController,
+            onChanged: onSearchChanged,
+            trailing: trailing,
+            hintText: tr('search'),
+          ),
+        ),
+      );
+    }
+
+    final progressNotifier = context.read<AppsProvider>().refreshProgress;
+
+    return SearchAppBar(
+      leading: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(12, 0, 4, 0),
+        child: ValueListenableBuilder(
+          valueListenable: progressNotifier,
+          builder: (context, refreshProgress, child) {
+            final Widget refreshButton = IconButton(
+              style: ButtonStyle(
+                backgroundColor: WidgetStatePropertyAll(
+                  Theme.of(context).colorScheme.surfaceContainer,
                 ),
-                leading: const Icon(Icons.search_rounded),
-                trailing: trailing,
-                onChanged: (value) {
-                  onSearchChanged(value);
-                },
+                tapTargetSize: MaterialTapTargetSize.padded,
               ),
+              onPressed: refreshProgress == null
+                  ? () => refreshIndicatorKey.currentState?.show()
+                  : null,
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: tr('refresh'),
+            );
+            return refreshProgress != null
+                ? Stack(
+                    children: [
+                      refreshButton,
+                      Positioned.fill(
+                        child: CircularProgressIndicator(
+                          constraints: const BoxConstraints(),
+                          padding: EdgeInsets.zero,
+                          strokeWidth: 3,
+                          value: refreshProgress,
+                        ),
+                      ),
+                    ],
+                  )
+                : refreshButton;
+          },
+        ),
+      ),
+      searchBar: SearchBar(
+        backgroundColor: WidgetStatePropertyAll(
+          Theme.of(context).colorScheme.surfaceContainer,
+        ),
+        padding: const WidgetStatePropertyAll(
+          EdgeInsetsDirectional.fromSTEB(24 / 2, 0, 4, 0),
+        ),
+        controller: searchController,
+        onChanged: onSearchChanged,
+        hintText: tr('searchX', args: [tr('appsString').toLowerCase()]),
+        trailing: [
+          _getSelectAllButton(context, listedApps),
+          const SizedBox(width: 4),
+          IconButton(
+            style: ButtonStyle(
+              minimumSize: const WidgetStatePropertyAll(Size(32, 32)),
+              maximumSize: const WidgetStatePropertyAll(Size(32, 32)),
+              padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+              backgroundColor: WidgetStatePropertyAll(
+                Theme.of(context).colorScheme.surfaceContainerHigh,
+              ),
+              foregroundColor: WidgetStatePropertyAll(
+                Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            tooltip: isFilterOff
+                ? tr('filterApps')
+                : '${tr('filter')} - ${tr('remove')}',
+            onPressed: () => showFilterDialog(context),
+            onLongPress: () => clearSearchAndFilter(),
+            icon: Icon(
+              isFilterOff
+                  ? Icons.filter_list_rounded
+                  : Icons.filter_alt_off_outlined,
+              opticalSize: 20,
+              size: 20,
+            ),
+          ),
+        ],
+      ),
+      trailing: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(8, 0, 4, 0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              style: ButtonStyle(
+                backgroundColor: WidgetStatePropertyAll(
+                  Theme.of(context).colorScheme.surfaceContainerLow,
+                ),
+                tapTargetSize: MaterialTapTargetSize.padded,
+              ),
+              onPressed: () {
+                NavHelper.pushSettingsPage(context);
+              },
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: tr('settings'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1313,37 +1431,38 @@ class AppsPageState extends State<AppsPage> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 controller: scrollController,
                 slivers: <Widget>[
-                  CustomAppBar(
-                    title: tr('appsString'),
-                    actions: [
-                      if (settingsProvider.isTV)
-                        IconButton(
-                          onPressed: toggleSelectionMode,
-                          icon: Icon(
-                            _selectionMode
-                                ? Icons.close_rounded
-                                : Icons.checklist_rounded,
+                  if (settingsProvider.isTV || appsProvider.apps.isEmpty)
+                    CustomAppBar(
+                      title: tr('appsString'),
+                      actions: [
+                        if (settingsProvider.isTV)
+                          IconButton(
+                            onPressed: toggleSelectionMode,
+                            icon: Icon(
+                              _selectionMode
+                                  ? Icons.close_rounded
+                                  : Icons.checklist_rounded,
+                            ),
+                            tooltip: _selectionMode
+                                ? tr('close')
+                                : plural('action', 2),
                           ),
-                          tooltip: _selectionMode
-                              ? tr('close')
-                              : plural('action', 2),
-                        ),
-                      if (settingsProvider.isTV)
+                        if (settingsProvider.isTV)
+                          IconButton(
+                            onPressed: () =>
+                                refreshIndicatorKey.currentState?.show(),
+                            icon: const Icon(Icons.refresh_rounded),
+                            tooltip: tr('refresh'),
+                          ),
                         IconButton(
-                          onPressed: () =>
-                              refreshIndicatorKey.currentState?.show(),
-                          icon: const Icon(Icons.refresh_rounded),
-                          tooltip: tr('refresh'),
+                          onPressed: () {
+                            NavHelper.pushSettingsPage(context);
+                          },
+                          icon: const Icon(Icons.settings_outlined),
+                          tooltip: tr('settings'),
                         ),
-                      IconButton(
-                        onPressed: () {
-                          NavHelper.pushSettingsPage(context);
-                        },
-                        icon: const Icon(Icons.settings_outlined),
-                        tooltip: tr('settings'),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   if (appsProvider.apps.isNotEmpty)
                     _getSearchBarSliver(context, settingsProvider, listedApps),
                   if (appsProvider.apps.isNotEmpty)
@@ -1356,7 +1475,8 @@ class AppsPageState extends State<AppsPage> {
                       trackOnlyUpdateIdsAllOrSelected,
                     ),
                   ..._getLoadingWidgets(context, appsProvider, listedApps),
-                  const _RefreshProgressBar(),
+                  if (settingsProvider.isTV || appsProvider.apps.isEmpty)
+                    const _RefreshProgressBar(),
                   _getDisplayedList(
                     context,
                     listedApps,
